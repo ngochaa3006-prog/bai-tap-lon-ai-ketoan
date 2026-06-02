@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from utils.thuytien_cashflow import tinh_loi_nhuan_12_thang
 from utils.utils import preprocess_and_clean, apply_pca_algorithm
 from utils.thuytrang_benchmark import tinh_trung_binh_nganh
 
@@ -239,3 +240,43 @@ with tab2:
                     * **Hệ quả Kế toán Quản trị:** Tín hiệu này cảnh báo việc sử dụng tài sản đang bị lãng phí, ứ đọng hàng tồn kho hoặc phát sinh nợ xấu trong các khoản phải thu. Biên lợi nhuận bị thu hẹp do không kiểm soát tốt chi phí đầu vào hoặc do năng lực cạnh tranh sản phẩm trên thị trường bị suy giảm.
                     * **Giải pháp khuyến nghị:** Ban điều hành cần bóc tách chỉ số này bằng mô hình DuPont để định vị chính xác điểm nghẽn nằm ở khâu Quản lý tài sản hay khâu Biên lợi nhuận thuần. Tiến hành rà soát cắt giảm triệt để các chi phí bất hợp lý và khẩn trương thu hồi công nợ quá hạn.
                     """)
+                # ==========================================================
+    # KHU VỰC CỦA THÀNH VIÊN 3 (ĐÃ ĐƯỢC TÁCH HÀM SANG UTILS/CASHFLOW.PY)
+    # ==========================================================
+
+    st.markdown("---") # Tạo một đường kẻ ngang phân cách
+    st.header("📈 Nhiệm vụ 3: Tái cấu trúc Dòng tiền & Giả lập Phục hồi")
+    st.info("Nhập các thông số vốn cứu trợ và lãi suất để theo dõi biểu đồ dự phóng 12 tháng.")
+
+    # Thiết kế form nhập liệu chia làm 2 cột
+    col_member3_1, col_member3_2 = st.columns(2)
+
+    with col_member3_1:
+        von_nhap = st.number_input(
+            "Số vốn cứu trợ ban đầu (VND):", 
+            min_value=0.0, 
+            value=500000000.0, # Giá trị mặc định 500 triệu
+            step=50000000.0,
+            format="%f"
+        )
+        
+    with col_member3_2:
+        lai_suat_nhap = st.number_input(
+            "Lãi suất sinh lời kỳ vọng (%/năm):", 
+            min_value=0.0, 
+            max_value=100.0, 
+            value=10.0, # Giá trị mặc định 10%
+            step=0.5
+        )
+        
+    # Nút bấm kích hoạt tính toán và vẽ đồ thị
+    if st.button("Chạy Giả Lập Phục Hồi Dòng Tiền", type="primary"):
+        # Gọi hàm xử lý tính toán từ file utils/thuytien_cashflow.py
+        df_ket_qua = tinh_loi_nhuan_12_thang(von_nhap, lai_suat_nhap)
+        
+        st.subheader("Bảng dự phóng xu hướng ngân sách phục hồi")
+        st.line_chart(data=df_ket_qua, x="Tháng", y="Ngân sách phục hồi (VND)")
+        
+        with st.expander("🔍 Chi tiết số liệu kế toán từng tháng"):
+            st.dataframe(df_ket_qua, use_container_width=True)
+      
