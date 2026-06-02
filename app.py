@@ -96,19 +96,19 @@ with tab1:
             ax3.grid(True, linestyle='--', alpha=0.5)
             st.pyplot(fig3)
             # =======================================================
-# NHIỆM VỤ THÀNH VIÊN 2 (THÙY TRANG) - ĐỐI CHIẾU TRUNG BÌNH NGÀNH
+# NHIỆM VỤ THÀNH VIÊN 2 (THÙY TRANG) - NHẬP DỮ LIỆU & THẨM ĐỊNH CHUYÊN SÂU
 # =======================================================
 with tab2:
-    st.header("🎯 Nhiệm vụ Thành viên 2: Phân tích & Đối chiếu Trung bình Ngành")
-    st.caption("Giải pháp quản trị: Xác định vị thế tài chính và cảnh báo sớm rủi ro cấu trúc vốn")
+    st.header("🎯 Phân tích Đối chiếu Benchmark & Thẩm định Chuyên sâu")
+    st.caption("Giải pháp quản trị: Cho phép nhập chỉ số tài chính động để tự động xuất báo cáo cảnh báo sớm rủi ro")
     st.write("---")
 
     try:
         df_tab2 = pd.read_csv("data/dulieuketoan_clean.csv")
-        # Lọc lấy danh sách các cột dạng số thực sự để tính toán
+        # Lọc lấy danh sách các cột dạng số thực sự để tính toán trung bình ngành
         numeric_cols_tab2 = df_tab2.select_dtypes(include=['number']).columns.tolist()
         if 'Bankrupt?' in numeric_cols_tab2:
-            numeric_cols_tab2.remove('Bankrupt?') # Loại bỏ biến mục tiêu ra khỏi chỉ số đối chiếu
+            numeric_cols_tab2.remove('Bankrupt?') 
     except FileNotFoundError:
         st.warning("⚠️ Không tìm thấy file dữ liệu 'dulieuketoan_clean.csv' trong thư mục data.")
         df_tab2 = pd.DataFrame()
@@ -117,117 +117,125 @@ with tab2:
     if not df_tab2.empty and len(numeric_cols_tab2) > 0:
         
         # ----------------------------------------------------
-        # KHU VỰC ĐIỀU KHIỂN TƯƠNG TÁC (CONTROL PANEL)
+        # KHU VỰC NHẬP DỮ LIỆU ĐỘNG (INTERACTIVE INPUT PANEL)
         # ----------------------------------------------------
-        st.subheader("🛠️ Bộ điều khiển phân tích chuyên sâu")
+        st.subheader("✍️ Nhập số liệu Doanh nghiệp cần Thẩm định")
+        
         ctrl_col1, ctrl_col2 = st.columns(2)
         
         with ctrl_col1:
-            # Cho phép chọn bất kỳ doanh nghiệp nào theo ID dòng
-            danh_sach_dn = list(range(len(df_tab2)))
-            idx_doanh_nghiep = st.selectbox(
-                "1. Chọn doanh nghiệp mẫu cần kiểm tra:", 
-                options=danh_sach_dn,
-                format_func=lambda x: f"Doanh nghiệp mã số ứng viên #{x}"
+            # Chọn chỉ số cần phân tích trước
+            target_metric = st.selectbox(
+                "1. Chọn chỉ số tài chính cần kiểm tra Benchmark:", 
+                options=numeric_cols_tab2
             )
+            # Tính toán ngay mốc trung bình ngành từ file CSV để làm hệ quy chiếu
+            moc_trung_binh = float(df_tab2[target_metric].mean())
+            st.info(f"🏭 Mức trung bình toàn ngành hiện tại: **{moc_trung_binh:.4f}**")
             
         with ctrl_col2:
-            # Tự động tìm kiếm các cột liên quan đến Nợ/Đòn bẩy để ưu tiên hiển thị trước
-            default_index = 0
-            for i, col in enumerate(numeric_cols_tab2):
-                if 'debt' in col.lower() or 'no' in col.lower():
-                    default_index = i
-                    break
-            
-            # Cho phép chọn bất kỳ chỉ số nào trong data để đối chiếu với toàn ngành
-            target_metric = st.selectbox(
-                "2. Chọn chỉ số tài chính cần đối chiếu Benchmark:", 
-                options=numeric_cols_tab2,
-                index=default_index
+            # KHU VỰC CHO PHÉP TỰ GÕ SỐ: Dùng st.number_input thay vì selectbox
+            # Để mặc định ban đầu bằng chính mức trung bình ngành cho đẹp giao diện
+            gia_tri_dn = st.number_input(
+                "2. Nhập giá trị thực tế của Doanh nghiệp bạn (Gõ số vào đây):", 
+                value=round(moc_trung_binh, 4),
+                format="%.4f",
+                step=0.0001
             )
 
         st.write("---")
         
         # ----------------------------------------------------
-        # THUẬT TOÁN XỬ LÝ & TÍNH TOÁN (BACKEND TRUY XUẤT)
+        # THUẬT TOÁN XỬ LÝ ĐỘ LỆCH VÀ PHÂN LOẠI BIẾN TÀI CHÍNH
         # ----------------------------------------------------
-        moc_trung_binh = tinh_trung_binh_nganh(df_tab2, target_metric)
-        gia_tri_dn = float(df_tab2[target_metric].iloc[idx_doanh_nghiep])
         chenh_lech = gia_tri_dn - moc_trung_binh
+        phan_tram_lech = (chenh_lech / moc_trung_binh) * 100 if moc_trung_binh != 0 else 0
         
-        # Xác định logic tài chính: Hệ số nợ cao = nguy cơ; ROA/ROE cao = tốt
-        is_leverage_metric = any(keyword in target_metric.lower() for keyword in ['debt', 'no', 'liability', 'dependency'])
+        # Xác định logic tài chính: Nhóm Đòn bẩy/Nợ vay (Càng cao càng rủi ro) và Nhóm Hiệu năng/Sinh lời (Càng cao càng tốt)
+        is_leverage_metric = any(keyword in target_metric.lower() for keyword in ['debt', 'no', 'liability', 'dependency', 'borrow'])
         
         if is_leverage_metric:
-            color_logic = "inverse"  # Chỉ số nợ: Cao hơn ngành = Đỏ, Thấp hơn = Xanh
+            color_logic = "inverse"  # Chỉ số nợ: Cao hơn ngành = Đỏ (Nguy hiểm), Thấp hơn = Xanh (An toàn)
             is_risky = gia_tri_dn > moc_trung_binh
         else:
-            color_logic = "normal"   # Chỉ số hiệu quả: Cao hơn = Xanh, Thấp hơn = Đỏ
+            color_logic = "normal"   # Chỉ số hiệu quả: Cao hơn = Xanh (Tốt), Thấp hơn = Đỏ (Kém)
             is_risky = gia_tri_dn < moc_trung_binh
 
         # ----------------------------------------------------
-        # HIỂN THỊ THẺ KPI VÀ TRỰC QUAN HÓA
+        # HIỂN THỊ TRỰC QUAN HÓA THEO DỮ LIỆU NHẬP
         # ----------------------------------------------------
-        st.subheader(f"📊 Kết quả đối chiếu chỉ số: {target_metric}")
+        st.subheader("📊 Trực quan hóa vị thế Doanh nghiệp so với Ngành")
         
-        view_col1, view_col2 = st.columns([1, 1.2])
+        view_col1, view_col2 = st.columns([1, 1.3])
         
         with view_col1:
             st.markdown("<br>", unsafe_allow_html=True)
             st.metric(
-                label=f"🏢 Giá trị tại Doanh nghiệp #{idx_doanh_nghiep}", 
+                label="🏢 Chỉ số Doanh nghiệp bạn gõ", 
                 value=f"{gia_tri_dn:.4f}", 
-                delta=f"{chenh_lech:.4f} so với mức chung",
+                delta=f"{phan_tram_lech:.2f}% so với ngành",
                 delta_color=color_logic
             )
             st.metric(
-                label="🏭 Mốc Trung bình Toàn Ngành (Benchmark)", 
+                label="🏭 Benchmark (Trung bình Ngành)", 
                 value=f"{moc_trung_binh:.4f}"
             )
             
         with view_col2:
-            # Tạo biểu đồ trực quan hóa Benchmark riêng cho Tab 2
-            fig_bench, ax_bench = plt.subplots(figsize=(6, 3.2))
-            categories = ['Doanh nghiệp đang xét', 'Trung bình Toàn Ngành']
+            # Vẽ biểu đồ thanh ngang so sánh trực quan dữ liệu người dùng nhập vào
+            fig_bench, ax_bench = plt.subplots(figsize=(6, 3))
+            categories = ['Doanh nghiệp của bạn', 'Trung bình Ngành']
             values = [gia_tri_dn, moc_trung_binh]
             bar_colors = ['#FF4B4B' if is_risky else '#29B5E8', '#4A5568']
             
-            bars = ax_bench.bar(categories, values, color=bar_colors, width=0.4, edgecolor='black', alpha=0.85)
-            ax_bench.set_title(f"So sánh trực quan chỉ số {target_metric}", fontsize=10, fontweight='bold')
-            ax_bench.grid(True, axis='y', linestyle='--', alpha=0.7)
+            bars = ax_bench.barh(categories, values, color=bar_colors, height=0.4, edgecolor='black', alpha=0.9)
+            ax_bench.set_title(f"Đối chiếu dữ liệu nhập vào của chỉ số {target_metric}", fontsize=9, fontweight='bold')
+            ax_bench.grid(True, axis='x', linestyle='--', alpha=0.5)
             
-            # Thêm nhãn giá trị lên đầu cột biểu đồ
             for bar in bars:
-                height = bar.get_height()
-                ax_bench.annotate(f'{height:.4f}',
-                            xy=(bar.get_x() + bar.get_width() / 2, height),
-                            xytext=(0, 3),
+                width = bar.get_width()
+                ax_bench.annotate(f' {width:.4f}',
+                            xy=(width, bar.get_y() + bar.get_height() / 2),
+                            xytext=(3, 0),
                             textcoords="offset points",
-                            ha='center', va='bottom', fontsize=9, fontweight='bold')
+                            ha='left', va='center', fontsize=9, fontweight='bold')
             
             st.pyplot(fig_bench)
 
         # ----------------------------------------------------
-        # HỆ THỐNG CỐ VẤN TỰ ĐỘNG
+        # HỆ THỐNG XUẤT BÁO CÁO THẨM ĐỊNH CHUYÊN SÂU ĐỘNG
         # ----------------------------------------------------
         st.write("---")
-        st.markdown("### 💡 Đánh giá & Khuyến nghị Quản trị từ Chuyên gia:")
+        st.subheader("📝 BÁO CÁO THẨM ĐỊNH TÀI CHÍNH & KHUYẾN NGHỊ QUẢN TRỊ CHUYÊN SÂU")
         
         with st.container():
             if is_leverage_metric:
                 if gia_tri_dn > moc_trung_binh:
-                    st.error(f"**🔴 CẢNH BÁO CẤU TRÚC VỐN:** Doanh nghiệp #{idx_doanh_nghiep} có chỉ số đòn bẩy tài chính ({gia_tri_dn:.4f}) vượt mức trung bình ngành ({moc_trung_binh:.4f}). Doanh nghiệp đang phụ thuộc lớn vào vốn vay ngoài, dẫn tới áp lực chi phí lãi vay tăng cao, làm thu hẹp biên lợi nhuận ròng và gia tăng rủi ro thanh khoản.")
+                    st.error(f"""
+                    **🔴 CẢNH BÁO RỦI RO CẤU TRÚC VỐN (Đòn bẩy tài chính vượt ngưỡng an toàn):**
+                    * **Thực trạng định lượng:** Chỉ số đòn bẩy tài chính bạn nhập vào đang cao hơn mức trung bình ngành **{abs(phan_tram_lech):.2f}%**.
+                    * **Hệ quả Kế toán Quản trị:** Doanh nghiệp đang phụ thuộc quá mức vào nguồn vốn vay từ bên ngoài. Việc này đẩy **Chi phí sử dụng vốn bình quân (WACC)** lên cao, tạo áp lực trả gốc và lãi vay đè nặng lên dòng tiền thuần từ hoạt động kinh doanh, làm suy giảm nghiêm trọng biên lợi nhuận ròng và gia tăng rủi ro kiệt quệ tài chính (Financial Distress).
+                    * **Giải pháp khuyến nghị:** Hội đồng quản trị cần hạn chế ký kết các hợp đồng vay ngắn hạn mới; xem xét phương án tái cấu trúc nguồn vốn bằng cách phát hành thêm cổ phiếu phổ thông để tăng tỷ trọng Vốn chủ sở hữu, hoặc thương lượng chuyển đổi nợ thành cổ phần để đưa hệ số an toàn về mức Benchmark ngành.
+                    """)
                 else:
-                    st.success(f"**🟢 CẤU TRÚC VỐN AN TOÀN:** Chỉ số đòn bẩy tài chính ({gia_tri_dn:.4f}) của doanh nghiệp được kiểm soát an toàn dưới ngưỡng trung bình của ngành ({moc_trung_binh:.4f}). Doanh nghiệp có năng lực tự chủ tài chính tốt và rủi ro vỡ nợ thấp.")
+                    st.success(f"""
+                    **🟢 VỊ THẾ AN TOÀN VỐN (Cấu trúc vốn tự chủ vững chắc):**
+                    * **Thực trạng định lượng:** Chỉ số rủi ro nợ vay thấp hơn mức trung bình ngành **{abs(phan_tram_lech):.2f}%**.
+                    * **Hệ quả Kế toán Quản trị:** Doanh nghiệp kiểm soát rất tốt rủi ro vỡ nợ, có mức độ tự chủ tài chính cao, tạo lòng tin lớn cho các tổ chức tín dụng và nhà đầu tư dài hạn. Biên độ an toàn tài chính rộng giúp doanh nghiệp chống chịu tốt trước các cú sốc thắt chặt tiền tệ của thị trường.
+                    * **Lưu ý tối ưu:** Tuy nhiên, đứng dưới góc độ Kế toán Quản trị chuyên sâu, việc duy trì tỷ lệ nợ quá thấp có thể khiến doanh nghiệp bỏ lỡ lợi ích từ **Lá chắn thuế từ lãi vay (Tax Shield)** và không tối ưu hóa được hiệu ứng đòn bẩy để gia tăng tỷ suất lợi nhuận trên vốn chủ sở hữu (ROE). Doanh nghiệp có thể cân nhắc sử dụng vốn vay một cách có kiểm soát cho các dự án mở rộng có NPV dương.
+                    """)
             else:
                 if gia_tri_dn >= moc_trung_binh:
-                    st.success(f"**🟢 HIỆU QUẢ HOẠT ĐỘNG VƯỢT TRỘI:** Chỉ số hiệu năng kinh doanh ({gia_tri_dn:.4f}) cao hơn mặt bằng chung toàn ngành ({moc_trung_binh:.4f}). Chứng tỏ doanh nghiệp có lợi thế cạnh tranh cao và quản lý tài sản hiệu quả.")
+                    st.success(f"""
+                    **🟢 LỢI THẾ CẠNH TRANH VÀ HIỆU QUẢ HOẠT ĐỘNG XUẤT SẮC:**
+                    * **Thực trạng định lượng:** Chỉ số năng lực hoạt động/hiệu quả sinh lời vượt mức trung bình ngành **{abs(phan_tram_lech):.2f}%**.
+                    * **Hệ quả Kế toán Quản trị:** Chứng tỏ doanh nghiệp sở hữu quy trình vận hành tối ưu, quản lý chi phí chặt chẽ (giảm thiểu giá vốn hàng bán COGS và chi phí quản lý doanh nghiệp OPEX), hoặc tốc độ vòng quay tài sản rất nhanh. Khả năng tạo ra thặng dư kinh tế trên mỗi đồng vốn đầu tư tốt hơn mặt bằng chung của thị trường.
+                    * **Giải pháp định hướng:** Cần tiếp tục duy trì chiến lược tối ưu hóa này, đầu tư sâu vào hệ thống chuyển đổi số để khóa chặt lợi thế cạnh tranh về chi phí, đồng thời có thể áp dụng chính sách chi trả cổ tức cởi mở hơn để thu hút dòng vốn.
+                    """)
                 else:
-                    st.error(f"**🔴 CẢNH BÁO HIỆU QUẢ HOẠT ĐỘNG:** Chỉ số năng lực ({gia_tri_dn:.4f}) đang chạy tụt hậu so với mốc trung bình toàn ngành ({moc_trung_binh:.4f}). Cần rà soát ngay các điểm nghẽn trong chuỗi vận hành và tái cấu trúc tài sản.")
-                    
-        with st.expander("📘 Đọc hiểu tài liệu: Tầm quan trọng của Mốc Trung bình Ngành (Benchmark)"):
-            st.markdown("""
-            Trong phân tích tài chính kế toán hiện đại, một con số đơn lẻ trên Báo cáo tài chính không mang nhiều ý nghĩa nếu không được đặt vào bối cảnh toàn ngành.
-            * **Xác định vị thế:** Mốc trung bình ngành hoạt động như một hệ quy chiếu giúp nhà quản trị biết doanh nghiệp mình đang đứng ở đâu.
-            * **Phát hiện bất thường:** Sự lệch pha quá lớn của một chỉ số so với Benchmark là tín hiệu cảnh báo sớm các rủi ro tiềm ẩn.
-            """)
+                    st.error(f"""
+                    **🔴 CẢNH BÁO SUY GIẢM HIỆU NĂNG HOẠT ĐỘNG VÀ NĂNG LỰC SINH LỜI:**
+                    * **Thực trạng định lượng:** Chỉ số hiệu năng hoạt động hiện tại đang chạy tụt hậu so với mặt bằng chung toàn ngành **{abs(phan_tram_lech):.2f}%**.
+                    * **Hệ quả Kế toán Quản trị:** Tín hiệu này cảnh báo việc sử dụng tài sản đang bị lãng phí, ứ đọng hàng tồn kho hoặc phát sinh nợ xấu trong các khoản phải thu. Biên lợi nhuận bị thu hẹp do không kiểm soát tốt chi phí đầu vào hoặc do năng lực cạnh tranh sản phẩm trên thị trường bị suy giảm.
+                    * **Giải pháp khuyến nghị:** Ban điều hành cần bóc tách chỉ số này bằng mô hình DuPont để định vị chính xác điểm nghẽn nằm ở khâu Quản lý tài sản hay khâu Biên lợi nhuận thuần. Tiến hành rà soát cắt giảm triệt để các chi phí bất hợp lý và khẩn trương thu hồi công nợ quá hạn.
+                    """)
