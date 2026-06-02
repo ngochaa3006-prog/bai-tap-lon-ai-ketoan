@@ -1,0 +1,16 @@
+# Thư mục chứa môi trường ảo và bộ nhớ đệm ẩn của Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Thư mục ẩn của hệ điều hành và IDE
+.DS_Store
+.vscode/
+
+# File cấu hình bảo mật mật mã tài khoản (Bắt buộc phải giấu)
+.env
+
+# Các file lưu trữ mô hình AI lớn (nếu có ở bước sau)
+*.pkl
+*.joblib
