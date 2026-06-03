@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import math
+def tinh_giai_thua(n):
+    return math.factorial(n)
 from utils.thuytien_cashflow import tinh_loi_nhuan_12_thang
 from utils.utils import preprocess_and_clean, apply_pca_algorithm
 from utils.thuytrang_benchmark import tinh_trung_binh_nganh
@@ -279,4 +282,24 @@ with tab2:
         
         with st.expander("🔍 Chi tiết số liệu kế toán từng tháng"):
             st.dataframe(df_ket_qua, use_container_width=True)
+            st.write("---")
+st.header("🔥 Stress Testing")
+
+so_rui_ro = st.slider(
+    "Chọn số lượng rủi ro",
+    min_value=1,
+    max_value=10,
+    value=3
+)
+
+so_kich_ban = tinh_giai_thua(so_rui_ro)
+
+st.success(
+    f"📊 Số lượng kịch bản khủng hoảng có thể xảy ra: {so_kich_ban}"
+)
+
+if so_kich_ban > 1000:
+    st.error(
+        "⚠️ CẢNH BÁO: Số lượng kịch bản khủng hoảng rất lớn!"
+    )
       
