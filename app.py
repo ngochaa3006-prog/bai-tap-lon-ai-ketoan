@@ -134,7 +134,7 @@ with tab2:
                 options=numeric_cols_tab2
             )
             # Tính toán ngay mốc trung bình ngành từ file CSV để làm hệ quy chiếu
-            moc_trung_binh = float(df_tab2[target_metric].mean())
+            moc_trung_binh = tinh_trung_binh_nganh(df_tab2, target_metric)
             st.info(f"🏭 Mức trung bình toàn ngành hiện tại: **{moc_trung_binh:.4f}**")
             
         with ctrl_col2:
