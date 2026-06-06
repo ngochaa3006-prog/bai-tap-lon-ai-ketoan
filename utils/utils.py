@@ -34,4 +34,3 @@ def apply_pca_algorithm(scaled_data, n_components=2):
     explained_variance = pca.explained_variance_ratio_
     
     return pca_result, explained_variance, pca
-    return pca_result, explained_variance, pca
